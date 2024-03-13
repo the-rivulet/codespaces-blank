@@ -1,0 +1,24 @@
+@font-face {
+  font-family: "Mojangles";
+  src: url("./mojangles.ttf") format("truetype");
+}
+
+html {
+  background: black;
+  color: white;
+}
+
+#canvas {
+  top: 0;
+  left: 0;
+  position: absolute;
+}
+
+#tooltip {
+  position: absolute;
+  background: gray;
+  font-family: 'Courier New', Courier, monospace;
+  border-radius: 10px;
+  padding: 10px;
+  min-width: 50px;
+}
