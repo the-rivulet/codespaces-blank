@@ -1,13 +1,18 @@
 import { Direction, Position, format, mouseX, mouseY, scrX, scrY, zoomLevel } from "./globals.js";
-import { Player } from "./player.js";
+import { Player, fill } from "./player.js";
 export class Map {
     static tiles = [];
     static tileAt(pos) {
         let matches = this.tiles.filter(t => t.pos.x == pos.x && t.pos.y == pos.y);
         return matches.length ? matches[0] : null;
     }
+    static land = [];
+    static landAt(pos) {
+        let matches = this.land.filter(t => t.pos.x == pos.x && t.pos.y == pos.y);
+        return matches.length ? matches[0] : null;
+    }
     static tileByUUID(uuid) {
-        let matches = this.tiles.filter(t => t.uuid == uuid);
+        let matches = [...this.tiles, ...this.land].filter(t => t.uuid == uuid);
         return matches.length ? matches[0] : null;
     }
     static positionAt(x, y) {
@@ -19,13 +24,16 @@ export class Map {
     static get hoveredTile() {
         return this.tileAt(this.mousePos);
     }
+    static get hoveredLand() {
+        return this.landAt(this.mousePos);
+    }
 }
 export class Tile {
     pos;
     uuid;
     circuitInfo = [];
     constructor(pos) {
-        this.pos = pos;
+        this.pos = pos instanceof Position ? pos : new Position(pos.x, pos.y);
         this.uuid = Math.random();
     }
     get circuitCurrents() {
@@ -48,18 +56,21 @@ export class Tile {
     }
     render(context) { }
     hasConnection(direction) { return false; }
-    get tooltip() { return ""; }
+    get tooltip() { return "Unnamed Tile"; }
     isConnected(other) {
-        if ((other.pos.plus(0, 1).equals(this.pos) && other.hasConnection(Direction.down)) ||
-            (other.pos.plus(0, -1).equals(this.pos) && other.hasConnection(Direction.up)) ||
-            (other.pos.plus(1).equals(this.pos) && other.hasConnection(Direction.right)) ||
-            (other.pos.plus(-1).equals(this.pos) && other.hasConnection(Direction.left))) {
+        if ((other.pos.plus(Direction.down).equals(this.pos) && other.hasConnection(Direction.down)) ||
+            (other.pos.plus(Direction.up).equals(this.pos) && other.hasConnection(Direction.up)) ||
+            (other.pos.plus(Direction.right).equals(this.pos) && other.hasConnection(Direction.right)) ||
+            (other.pos.plus(Direction.left).equals(this.pos) && other.hasConnection(Direction.left))) {
             return true;
         }
         else
             return false;
     }
     tick() { }
+    hasInventory() {
+        return "inventory" in this;
+    }
 }
 export class PowerSourceTile extends Tile {
     voltage = 0;
@@ -102,21 +113,19 @@ export class PowerDrainTile extends Tile {
 function renderWire(context, wire, color) {
     if (color)
         context.fillStyle = color;
-    let left = (wire.pos.x - Player.pos.x) * zoomLevel - scrX;
-    let top = (wire.pos.y - Player.pos.y) * zoomLevel - scrY;
-    context.fillRect(left + zoomLevel * 2 / 5, top + zoomLevel * 2 / 5, zoomLevel * 1 / 5, zoomLevel * 1 / 5);
-    let u = Map.tileAt(wire.pos.plus(0, -1));
+    fill(wire, context, 2, 2, 1, 1);
+    let u = Map.tileAt(wire.pos.plus(Direction.up));
     if (u && (u instanceof WireTile || wire.isConnected(u)))
-        context.fillRect(left + zoomLevel * 2 / 5, top, zoomLevel * 1 / 5, zoomLevel * 2 / 5);
-    let d = Map.tileAt(wire.pos.plus(0, 1));
+        fill(wire, context, 2, 0, 1, 2);
+    let d = Map.tileAt(wire.pos.plus(Direction.down));
     if (d && (d instanceof WireTile || wire.isConnected(d)))
-        context.fillRect(left + zoomLevel * 2 / 5, top + zoomLevel * 3 / 5, zoomLevel * 1 / 5, zoomLevel * 2 / 5);
-    let l = Map.tileAt(wire.pos.plus(-1));
+        fill(wire, context, 2, 3, 1, 2);
+    let l = Map.tileAt(wire.pos.plus(Direction.left));
     if (l && (l instanceof WireTile || wire.isConnected(l)))
-        context.fillRect(left, top + zoomLevel * 2 / 5, zoomLevel * 2 / 5, zoomLevel * 1 / 5);
-    let r = Map.tileAt(wire.pos.plus(1));
+        fill(wire, context, 0, 2, 2, 1);
+    let r = Map.tileAt(wire.pos.plus(Direction.right));
     if (r && (r instanceof WireTile || wire.isConnected(r)))
-        context.fillRect(left + zoomLevel * 3 / 5, top + zoomLevel * 2 / 5, zoomLevel * 2 / 5, zoomLevel * 1 / 5);
+        fill(wire, context, 3, 2, 2, 1);
 }
 export class WireTile extends Tile {
     constructor(pos) {
@@ -127,4 +136,14 @@ export class WireTile extends Tile {
         renderWire(context, this, "gray");
     }
     get tooltip() { return format("Wire <b> Transmits energy. <b>"); }
+}
+export class ResourceTile extends Tile {
+    resource;
+    powerCost;
+    constructor(pos, resource, cost) {
+        super(pos);
+        this.resource = resource;
+        this.powerCost = cost;
+    }
+    get tooltip() { return format(`${this.resource[0].toUpperCase() + this.resource.slice(1)} Deposit <b> Mine this for ${this.resource}. <b>`); }
 }

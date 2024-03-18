@@ -1,6 +1,6 @@
-import { getId, scrX, scrY, keysDown, log, Position, zoomLevel, format, framerate, Color } from "./globals.js";
+import { getId, scrX, scrY, keysDown, log, zoomLevel, Direction, format, framerate, Color } from "./globals.js";
 import { Map, PowerDrainTile, PowerSourceTile, WireTile } from "./map.js";
-import { BatteryTile, LightTile } from "./tileset.js";
+import { BatteryTile, CoalTile, ConveyorTile, DrillTile, LightTile } from "./tileset.js";
 import { Player } from "./player.js";
 let canvas = getId("canvas");
 canvas.width = window.innerWidth;
@@ -8,37 +8,54 @@ canvas.height = window.innerHeight;
 let context = canvas.getContext("2d"); // override
 context.fillStyle = "red";
 function initialize() {
-    // not circuits
-    Map.tiles.push(new LightTile(new Position(1, 1)));
-    Map.tiles.push(new WireTile(new Position(1, 2)));
-    Map.tiles.push(new WireTile(new Position(0, 3)));
-    Map.tiles.push(new WireTile(new Position(0, 4)));
-    Map.tiles.push(new BatteryTile(new Position(0, 5)));
-    // 1 light, 1 battery
-    Map.tiles.push(new BatteryTile(new Position(11, 4)));
-    Map.tiles.push(new WireTile(new Position(11, 3)));
-    Map.tiles.push(new WireTile(new Position(11, 2)));
-    Map.tiles.push(new LightTile(new Position(11, 1)));
-    // 2 lights, 1 battery
-    Map.tiles.push(new WireTile(new Position(5, 2)));
-    Map.tiles.push(new WireTile(new Position(4, 2)));
-    Map.tiles.push(new LightTile(new Position(5, 1)));
-    Map.tiles.push(new LightTile(new Position(4, 1)));
-    Map.tiles.push(new BatteryTile(new Position(3, 2)));
-    // 1 light, 2 batteries
-    Map.tiles.push(new WireTile(new Position(8, 2)));
-    Map.tiles.push(new LightTile(new Position(8, 1)));
-    Map.tiles.push(new BatteryTile(new Position(7, 2)));
-    Map.tiles.push(new BatteryTile(new Position(9, 2)));
-    Map.tiles.push(new BatteryTile(new Position(8, 3)));
-    // battery powering multiple lights
-    Map.tiles.push(new BatteryTile(new Position(5, 5)));
-    Map.tiles.push(new WireTile(new Position(4, 5)));
-    Map.tiles.push(new BatteryTile(new Position(3, 5)));
-    Map.tiles.push(new LightTile(new Position(4, 4)));
-    Map.tiles.push(new BatteryTile(new Position(7, 5)));
-    Map.tiles.push(new WireTile(new Position(6, 5)));
-    Map.tiles.push(new LightTile(new Position(6, 4)));
+    Map.tiles = [
+        // not circuits
+        new LightTile({ x: 1, y: 1 }),
+        new WireTile({ x: 1, y: 2 }),
+        new WireTile({ x: 0, y: 3 }),
+        new WireTile({ x: 0, y: 4 }),
+        new BatteryTile({ x: 0, y: 5 }),
+        // 1 light, 1 battery
+        new BatteryTile({ x: 11, y: 3 }),
+        new WireTile({ x: 11, y: 2 }),
+        new LightTile({ x: 11, y: 1 }),
+        // 2 lights, 1 battery
+        new WireTile({ x: 5, y: 2 }),
+        new WireTile({ x: 4, y: 2 }),
+        new LightTile({ x: 5, y: 1 }),
+        new LightTile({ x: 4, y: 1 }),
+        new BatteryTile({ x: 3, y: 2 }),
+        // 1 light, 2 batteries
+        new WireTile({ x: 8, y: 2 }),
+        new LightTile({ x: 8, y: 1 }),
+        new BatteryTile({ x: 7, y: 2 }),
+        new BatteryTile({ x: 9, y: 2 }),
+        new BatteryTile({ x: 8, y: 3 }),
+        // battery powering multiple lights
+        new BatteryTile({ x: 5, y: 5 }),
+        new WireTile({ x: 4, y: 5 }),
+        new BatteryTile({ x: 3, y: 5 }),
+        new LightTile({ x: 4, y: 4 }),
+        new BatteryTile({ x: 7, y: 5 }),
+        new WireTile({ x: 6, y: 5 }),
+        new LightTile({ x: 6, y: 4 }),
+        // drills and such
+        new WireTile({ x: 12, y: 3 }),
+        new DrillTile({ x: 13, y: 3 }),
+        new ConveyorTile({ x: 13, y: 4 }, Direction.up),
+        new ConveyorTile({ x: 14, y: 4 }, Direction.up),
+        // just to look at them
+        new ConveyorTile({ x: 9, y: 4 }, Direction.up),
+        new ConveyorTile({ x: 10, y: 4 }, Direction.down),
+        new ConveyorTile({ x: 9, y: 5 }, Direction.left),
+        new ConveyorTile({ x: 10, y: 5 }, Direction.right),
+    ];
+    Map.land = [
+        new CoalTile({ x: 13, y: 3 }),
+        new CoalTile({ x: 14, y: 3 }),
+        new CoalTile({ x: 13, y: 2 }),
+        new CoalTile({ x: 14, y: 2 })
+    ];
 }
 function drawSelector(pos, color) {
     if (color)
@@ -64,9 +81,10 @@ function frame() {
         Player.pos.y -= 0.1;
     if (keysDown["s"])
         Player.pos.y += 0.1;
-    for (let i of Map.tiles) {
+    for (let i of Map.land)
         i.render(context);
-    }
+    for (let i of Map.tiles)
+        i.render(context);
     // draw the selector thingy
     drawSelector(Map.mousePos, (Player.tileUnderCursor ? "cyan" : "white"));
     if (Player.tileUnderCursor)
@@ -79,6 +97,14 @@ function frame() {
     }
     else {
         getId("tooltip").style.display = "none";
+    }
+    let tip2 = (Map.hoveredLand ? Map.hoveredLand.tooltip : "");
+    if (tip2) {
+        getId("tooltip2").style.display = "block";
+        getId("tooltip2").innerHTML = tip2;
+    }
+    else {
+        getId("tooltip2").style.display = "none";
     }
     // circuits!
     // first, reset all circuit info
@@ -97,10 +123,10 @@ function frame() {
         let voltage = 0;
         while (toSearch.length) {
             let i = toSearch[0];
-            let u = Map.tileAt(i.pos.plus(0, -1));
-            let d = Map.tileAt(i.pos.plus(0, 1));
-            let l = Map.tileAt(i.pos.plus(-1));
-            let r = Map.tileAt(i.pos.plus(1));
+            let u = Map.tileAt(i.pos.plus({ x: 0, y: -1 }));
+            let d = Map.tileAt(i.pos.plus({ x: 0, y: 1 }));
+            let l = Map.tileAt(i.pos.plus({ x: -1, y: 0 }));
+            let r = Map.tileAt(i.pos.plus({ x: 1, y: 0 }));
             for (let otherTile of [u, d, l, r]) {
                 if (otherTile && otherTile instanceof WireTile && !wiresWalked.includes(otherTile)) {
                     toSearch.push(otherTile);
@@ -146,7 +172,7 @@ function frame() {
         }
         if (t instanceof PowerDrainTile) {
             getId("tooltip").innerHTML += format(`
-      <b> Resistance: <s${Color.ohms}s>${Math.round(t.resistance * 100) / 100}</> V
+      <b> Resistance: <s${Color.ohms}s>${Math.round(t.resistance * 100) / 100}</> O
       <b> Current: <s${Color.amps}s>${Math.round(t.currentTotal * 100) / 100}</> A
       <b> Power: <s${Color.watts}s>${Math.round(t.wattageTotal * 100) / 100}</> W
       `);
@@ -154,13 +180,13 @@ function frame() {
         let hasV = t.circuitVoltageTotal > 0;
         let hasR = t.circuitResistanceTotal > 0;
         if (hasV)
-            getId("tooltip").innerHTML += format(`<b> Circuit Voltage: <s${Color.volts}s>${Math.round(t.circuitVoltageTotal * 100) / 100}</> V`);
+            getId("tooltip").innerHTML += format(`<b> Circuit Voltage: <s${Color.volts}s>${Math.round(t.circuitVoltageTotal * 100 / t.circuitInfo.length) / 100}</> V`);
         if (hasR)
-            getId("tooltip").innerHTML += format(`<b> Circuit Resistance: <s${Color.ohms}s>${Math.round(t.circuitResistanceTotal * 100) / 100}</> O`);
+            getId("tooltip").innerHTML += format(`<b> Circuit Resistance: <s${Color.ohms}s>${Math.round(t.circuitResistanceTotal * 100 / t.circuitInfo.length) / 100}</> O`);
         if (hasV && hasR) {
             getId("tooltip").innerHTML += format(`
-      <b> Circuit Current: <s${Color.amps}s>${Math.round(t.circuitCurrentTotal * 100) / 100}</> A
-      <b> Circuit Power: <s${Color.watts}s>${Math.round(t.circuitWattageTotal * 100) / 100}</> W
+      <b> Circuit Current: <s${Color.amps}s>${Math.round(t.circuitCurrentTotal * 100 / t.circuitInfo.length) / 100}</> A
+      <b> Circuit Power: <s${Color.watts}s>${Math.round(t.circuitWattageTotal * 100 / t.circuitInfo.length) / 100}</> W
       `);
         }
     }

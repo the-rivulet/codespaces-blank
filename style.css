@@ -14,7 +14,7 @@ html {
   position: absolute;
 }
 
-#tooltip {
+#tooltip, #tooltip2 {
   position: absolute;
   background: gray;
   font-family: 'Courier New', Courier, monospace;
